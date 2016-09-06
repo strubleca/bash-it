@@ -52,15 +52,63 @@ function load_some() {
   done
 }
 
-# Back up existing profile and create new one for bash-it
-function backup_new() {
-  test -w "$HOME/$CONFIG_FILE" &&
-  cp -aL "$HOME/$CONFIG_FILE" "$HOME/$CONFIG_FILE.bak" &&
-  echo -e "\033[0;32mYour original $CONFIG_FILE has been backed up to $CONFIG_FILE.bak\033[0m"
-  sed "s|{{BASH_IT}}|$BASH_IT|" "$BASH_IT/template/bash_profile.template.bash" > "$HOME/$CONFIG_FILE"
-  echo -e "\033[0;32mCopied the template $CONFIG_FILE into ~/$CONFIG_FILE, edit this file to customize bash-it\033[0m"
+# A mapping from template files to the configuration files that we want to
+# replace. The configuration files are assumed to be in the home directory.
+# This uses arrays to define the mapping. See 
+# http://stackoverflow.com/questions/688849/associative-arrays-in-shell-scripts
+# for the non-bash 4 way using this approach
+template_files=( "bash_profile.template.bash:.bash_profile"
+                 "bashrc.template.bash:.bashrc"
+                 "profile.template.sh:.profile" )
+
+# Back up existing configuration files and create new ones for bash-it
+function backup_append() {
+  for template in "${template_files[@]}"
+  do
+    src=${template%%:*}
+    dest=${template#*:}
+    template_file="${BASH_IT}/template/${src}"
+    config_file="${HOME}/${dest}"
+    test -w "${config_file}" &&
+      cp -aL "${config_file}" "${config_file}.bak" &&
+      echo -e "\033[0;32mYour original ${config_file} has been backed up to ${config_file}.bak\033[0m"
+    sed "s|{{BASH_IT}}|$BASH_IT|" "${template_file}" >> "${config_file}"
+    echo -e "\033[0;32mAppended the template ${template_file} to ${config_file}, edit this file to customize bash-it\033[0m"
+  done
 }
 
+# Back up existing configuration files and create new ones for bash-it
+function backup_new() {
+  for template in "${template_files[@]}"
+  do
+    src=${template%%:*}
+    dest=${template#*:}
+    template_file="${BASH_IT}/template/${src}"
+    config_file="${HOME}/${dest}"
+    test -w "${config_file}" &&
+      cp -aL "${config_file}" "${config_file}.bak" &&
+      echo -e "\033[0;32mYour original ${config_file} has been backed up to ${config_file}.bak\033[0m"
+    sed "s|{{BASH_IT}}|$BASH_IT|" "${template_file}" > "${config_file}"
+    echo -e "\033[0;32mCopied the template ${template_file} into ${config_file}, edit this file to customize bash-it\033[0m"
+  done
+}
+
+# Check to see if any backup files already exist
+function backup_exists() {
+  local retval=1
+  for template in "${template_files[@]}"
+  do
+    src=${template%%:*}
+    dest=${template#*:}
+    backup_file="${HOME}/${dest}.bak"
+    [ -e "${backup_file}" ] && 
+      echo -e "\033[0;33mBackup file ${backup_file} exists.\033[0m" &&
+      retval=0
+  done
+  return $retval
+}
+
+# Process command line options
 for param in "$@"; do
   shift
   case "$param" in
@@ -99,12 +147,17 @@ case $OSTYPE in
     ;;
 esac
 
-BACKUP_FILE=$CONFIG_FILE.bak
+#------------------------------------------------------------------------------
+# Go through installation steps.
+#------------------------------------------------------------------------------
 echo "Installing bash-it"
-if [ -e "$HOME/$BACKUP_FILE" ]; then
-  echo -e "\033[0;33mBackup file already exists. Make sure to backup your .bashrc before running this installation.\033[0m" >&2
+
+# Check to see if backup files already exist. If they do, ask before proceeding.
+if backup_exists
+then
+  echo -e "\033[0;33mBackup file(s) already exists. Make sure to backup your configurations before running this installation.\033[0m" >&2
   while ! [ $silent ];  do
-    read -e -n 1 -r -p "Would you like to overwrite the existing backup? This will delete your existing backup file ($HOME/$BACKUP_FILE) [y/N] " RESP
+    read -e -n 1 -r -p "Would you like to overwrite the existing backup(s)? This will delete your existing backup file(s) [y/N] " RESP
     case $RESP in
     [yY])
       break
@@ -120,16 +173,12 @@ if [ -e "$HOME/$BACKUP_FILE" ]; then
   done
 fi
 
+# If not silent, ask about appending or replacing configuration files.
 while ! [ $silent ]; do
-  read -e -n 1 -r -p "Would you like to keep your $CONFIG_FILE and append bash-it templates at the end? [y/N] " choice
+  read -e -n 1 -r -p "Would you like to keep your configuration files and append bash-it templates at the end? [y/N] " choice
   case $choice in
   [yY])
-    test -w "$HOME/$CONFIG_FILE" &&
-    cp -aL "$HOME/$CONFIG_FILE" "$HOME/$CONFIG_FILE.bak" &&
-    echo -e "\033[0;32mYour original $CONFIG_FILE has been backed up to $CONFIG_FILE.bak\033[0m"
-
-    (sed "s|{{BASH_IT}}|$BASH_IT|" "$BASH_IT/template/bash_profile.template.bash" | tail -n +2) >> "$HOME/$CONFIG_FILE"
-    echo -e "\033[0;32mBash-it template has been added to your $CONFIG_FILE\033[0m"
+    backup_append
     break
     ;;
   [nN]|"")
@@ -142,11 +191,13 @@ while ! [ $silent ]; do
   esac
 done
 
+# If silent, replace configuration files.
 if [ $silent ]; then
   # backup/new by default
   backup_new
 fi
 
+# Enable some plugins
 if [[ $interactive ]] && ! [[ $silent ]] ;
 then
   for type in "aliases" "plugins" "completion"

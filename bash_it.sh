@@ -28,6 +28,9 @@ then
     unset $BASH_THEME;
 fi
 
+# Set custom directory
+BASH_IT_CUSTOM=${BASH_IT_CUSTOM:-${BASH_IT}/custom}
+
 # Load composure first, so we support function metadata
 source "${BASH_IT}/lib/composure.bash"
 
@@ -66,16 +69,17 @@ do
   fi
 done
 
-# Custom
-CUSTOM="${BASH_IT}/custom/*.bash"
+# Load custom configuration files.
+CUSTOM="${BASH_IT_CUSTOM}/*.bash"
 for config_file in $CUSTOM
 do
   if [ -e "${config_file}" ]; then
     source $config_file
   fi
 done
-
 unset config_file
+
+# Set the prompt
 if [[ $PROMPT ]]; then
     export PS1="\["$PROMPT"\]"
 fi
@@ -86,7 +90,6 @@ PREVIEW="less"
 [ -s /Applications/Preview.app ] && PREVIEW="/Applications/Preview.app"
 
 # Load all the Jekyll stuff
-
 if [ -e "$HOME/.jekyllconfig" ]
 then
   . "$HOME/.jekyllconfig"

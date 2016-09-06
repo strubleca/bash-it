@@ -7,9 +7,7 @@ export GREP_COLOR='1;33'
 # colored ls
 export LSCOLORS='Gxfxcxdxdxegedabagacad'
 
-if [[ -z "$CUSTOM_THEME_DIR" ]]; then
-    CUSTOM_THEME_DIR="${BASH_IT}/custom/themes"
-fi
+CUSTOM_THEME_DIR=${BASH_IT_CUSTOM}/themes
 
 # Load the theme
 if [[ $BASH_IT_THEME ]]; then
